@@ -7,27 +7,27 @@ The system is designed as a **Stateful, Cyclic Multi-Agent Investigation Engine*
 ```mermaid
 graph TD
     %% Entry
-    Start([🚨 Production Incident Alert]) --> Orchestrator[<b>1. Orchestrator Agent</b><br/>Plans & delegates tasks]
+    Start(["🚨 Production Incident Alert"]) --> Orchestrator["1. Orchestrator Agent<br/>Plans & delegates tasks"]
 
     %% Parallel Investigation Branch
-    subgraph Parallel Specialists ["Parallel Investigation Branch"]
-        Orchestrator -->|Dispatch log & metric queries| ObsAgent[<b>2. Observability Agent</b><br/>• query_logs<br/>• query_metrics<br/>• Anomaly detection]
-        Orchestrator -->|Dispatch deploy & topology queries| DepAgent[<b>3. Dependency Agent</b><br/>• query_deployments<br/>• query_service_topology<br/>• query_historical_incidents]
+    subgraph ParallelBranch ["Parallel Investigation Branch"]
+        Orchestrator -->|"Dispatch log & metric queries"| ObsAgent["2. Observability Agent<br/>• query_logs<br/>• query_metrics<br/>• Anomaly detection"]
+        Orchestrator -->|"Dispatch deploy & topology queries"| DepAgent["3. Dependency Agent<br/>• query_deployments<br/>• query_service_topology<br/>• query_historical_incidents"]
     end
 
     %% Blackboard Fan-In
-    ObsAgent -->|Emit Verified Facts| SharedState[(<b>Shared Investigation State</b><br/>Blackboard: Facts vs Assumptions)]
-    DepAgent -->|Emit Verified Facts| SharedState
+    ObsAgent -->|"Emit Verified Facts"| SharedState[("Shared Investigation State<br/>Blackboard: Facts vs Assumptions")]
+    DepAgent -->|"Emit Verified Facts"| SharedState
 
-    SharedState --> Reasoning[<b>4. Reasoning Agent</b><br/>• Competing hypotheses H1, H2, H3<br/>• Calibrated confidence weights]
+    SharedState --> Reasoning["4. Reasoning Agent<br/>• Competing hypotheses H1, H2, H3<br/>• Calibrated confidence weights"]
 
-    Reasoning --> Critic[<b>5. Critic Agent (Auditor)</b><br/>• Challenges false correlations<br/>• Detects unsupported assumptions]
+    Reasoning --> Critic["5. Critic Agent - Auditor<br/>• Challenges false correlations<br/>• Detects unsupported assumptions"]
 
     %% Feedback Loop / Conditional Branch
-    Critic -->|Verdict: REQUEST_MORE_EVIDENCE<br/>Iteration < Max Iterations| Orchestrator
-    Critic -->|Verdict: APPROVED or INCONCLUSIVE<br/>or Max Iterations Reached| Reporter[<b>6. Reporting Agent</b><br/>• Executive summary<br/>• Facts vs assumptions table<br/>• Immediate & long-term actions]
+    Critic -->|"Verdict: REQUEST_MORE_EVIDENCE<br/>Iteration < Max Iterations"| Orchestrator
+    Critic -->|"Verdict: APPROVED or INCONCLUSIVE<br/>or Max Iterations Reached"| Reporter["6. Reporting Agent<br/>• Executive summary<br/>• Facts vs assumptions table<br/>• Immediate & long-term actions"]
 
-    Reporter --> EndNode([📄 Final Grounded RCA Report])
+    Reporter --> EndNode(["📄 Final Grounded RCA Report"])
 
     %% Styling
     style Start fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff

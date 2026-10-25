@@ -38,22 +38,22 @@ Built with **LangGraph**, **Pydantic**, and **Python**, featuring parallel speci
 
 ```mermaid
 graph TD
-    Start([🚨 Production Incident Alert]) --> Orchestrator[<b>1. Orchestrator Agent</b><br/>Plans & delegates tasks]
+    Start(["🚨 Production Incident Alert"]) --> Orchestrator["1. Orchestrator Agent<br/>Plans & delegates tasks"]
 
-    subgraph Parallel Specialists ["Parallel Investigation Branch"]
-        Orchestrator --> ObsAgent[<b>2. Observability Agent</b><br/>• query_logs<br/>• query_metrics]
-        Orchestrator --> DepAgent[<b>3. Dependency Agent</b><br/>• query_deployments<br/>• query_service_topology<br/>• query_historical_incidents]
+    subgraph ParallelBranch ["Parallel Investigation Branch"]
+        Orchestrator --> ObsAgent["2. Observability Agent<br/>• query_logs<br/>• query_metrics"]
+        Orchestrator --> DepAgent["3. Dependency Agent<br/>• query_deployments<br/>• query_service_topology<br/>• query_historical_incidents"]
     end
 
-    ObsAgent --> SharedState[(<b>Shared State (Blackboard)</b><br/>Facts vs Assumptions)]
+    ObsAgent --> SharedState[("Shared State Blackboard<br/>Facts vs Assumptions")]
     DepAgent --> SharedState
 
-    SharedState --> Reasoning[<b>4. Reasoning Agent</b><br/>Competing hypotheses H1, H2, H3]
-    Reasoning --> Critic[<b>5. Critic Agent (Auditor)</b><br/>Challenges unverified claims]
+    SharedState --> Reasoning["4. Reasoning Agent<br/>Competing hypotheses H1, H2, H3"]
+    Reasoning --> Critic["5. Critic Agent - Auditor<br/>Challenges unverified claims"]
 
-    Critic -->|Verdict: REQUEST_MORE_EVIDENCE<br/>Iteration < Max| Orchestrator
-    Critic -->|Verdict: APPROVED or INCONCLUSIVE| Reporter[<b>6. Reporting Agent</b><br/>Authoritative RCA & Mitigations]
-    Reporter --> EndNode([📄 Final Grounded RCA Report])
+    Critic -->|"Verdict: REQUEST_MORE_EVIDENCE<br/>Iteration < Max"| Orchestrator
+    Critic -->|"Verdict: APPROVED or INCONCLUSIVE"| Reporter["6. Reporting Agent<br/>Authoritative RCA & Mitigations"]
+    Reporter --> EndNode(["📄 Final Grounded RCA Report"])
 ```
 
 See [docs/architecture.md](docs/architecture.md) for full architectural documentation.
