@@ -16,7 +16,6 @@ from src.state.models import (
     InvestigationState,
     IncidentTicket,
     CriticVerdictStatus,
-    IncidentReport,
 )
 from src.tools.base import ToolExecutionContext
 from src.agents.orchestrator import orchestrator_node
