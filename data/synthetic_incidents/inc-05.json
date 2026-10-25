@@ -1,0 +1,89 @@
+{
+  "incident_id": "INC-05",
+  "title": "Search Service Response Degradation on Node k8s-worker-12",
+  "description": "Search queries taking 5,000ms instead of 80ms on worker node 12. Search container CPU is only 22%, but container is being severely throttled.",
+  "affected_service": "search-service",
+  "timestamp": "2026-10-24T19:00:00Z",
+  "severity": "MEDIUM",
+  "initial_symptoms": [
+    "Query latency 10x higher",
+    "Zero application error logs"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "Kubernetes node CPU starvation caused by an unconstrained batch data-pipeline job scheduled on the same host (noisy neighbor).",
+    "culprit_service": "batch-pipeline-job",
+    "key_evidence": [
+      "Node-level metrics show host CPU at 100%",
+      "search-service container throttled percentage at 88%",
+      "Zero application exceptions in search-service logs"
+    ],
+    "distractors": [
+      "Internal search-service CPU metric reports 22% (looks underutilized, leading engineers to suspect algorithmic lock)"
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2026-10-24T18:40:00Z",
+      "level": "INFO",
+      "service": "search-service",
+      "message": "Search index loaded, 4.2M documents"
+    },
+    {
+      "timestamp": "2026-10-24T18:50:00Z",
+      "level": "WARN",
+      "service": "k8s-kubelet",
+      "message": "CFS quota throttling search-service: 88% of execution periods throttled"
+    },
+    {
+      "timestamp": "2026-10-24T18:52:00Z",
+      "level": "INFO",
+      "service": "batch-pipeline-job",
+      "message": "Heavy video transcoding batch job started on node k8s-worker-12 without cpu_limit"
+    }
+  ],
+  "metrics": {
+    "search-service": {
+      "cpu": [
+        {
+          "timestamp": "2026-10-24T18:30:00Z",
+          "value": 20.0
+        },
+        {
+          "timestamp": "2026-10-24T19:00:00Z",
+          "value": 22.0
+        }
+      ],
+      "latency_p99": [
+        {
+          "timestamp": "2026-10-24T18:30:00Z",
+          "value": 85.0
+        },
+        {
+          "timestamp": "2026-10-24T19:00:00Z",
+          "value": 5200.0
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "search-service": []
+  },
+  "topology": {
+    "search-service": {
+      "service_type": "api_service",
+      "health_status": "DEGRADED",
+      "upstream": [
+        "web-gateway"
+      ],
+      "downstream": [
+        "elasticsearch-cluster"
+      ],
+      "config_summary": {
+        "node_affinity": "k8s-worker-12",
+        "cpu_limit": "2000m"
+      }
+    }
+  },
+  "historical_incidents": [],
+  "chaos_rules": {}
+}

@@ -1,0 +1,143 @@
+{
+  "incident_id": "INC-01",
+  "title": "Payment Service 504 Gateway Timeout Spike",
+  "description": "Payment transactions failing with 504 Gateway Timeout. Checkout conversion dropped 40% in the last 15 minutes.",
+  "affected_service": "payment-service",
+  "timestamp": "2026-10-24T14:15:00Z",
+  "severity": "CRITICAL",
+  "initial_symptoms": [
+    "504 Gateway Timeout",
+    "High latency on /charge endpoint"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "Database connection pool exhaustion caused by a configuration change reducing max_connections from 100 to 5.",
+    "culprit_service": "payment-service",
+    "key_evidence": [
+      "Deployment commit 'Tune pool size' lowered max_connections to 5 at 13:50 UTC",
+      "Logs at 14:05 UTC show DBConnectionError: connection pool exhausted",
+      "Error rate 5xx jumped from 0.01 to 0.45 at 14:05 UTC"
+    ],
+    "distractors": [
+      "DNS lookup warning in auth-service logs at 14:00 UTC (benign)"
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2026-10-24T13:45:00Z",
+      "level": "INFO",
+      "service": "payment-service",
+      "message": "Worker pool healthy with 50 workers"
+    },
+    {
+      "timestamp": "2026-10-24T14:00:00Z",
+      "level": "WARN",
+      "service": "auth-service",
+      "message": "DNS lookup took 45ms for ldap.corp.internal"
+    },
+    {
+      "timestamp": "2026-10-24T14:05:12Z",
+      "level": "ERROR",
+      "service": "payment-service",
+      "message": "Timeout waiting for available connection in pool",
+      "exception": "DBPoolTimeoutException: pool exhausted after 30000ms (max=5, in_use=5)"
+    },
+    {
+      "timestamp": "2026-10-24T14:08:30Z",
+      "level": "ERROR",
+      "service": "payment-service",
+      "message": "Transaction failed: DB connection acquired timeout",
+      "exception": "DBPoolTimeoutException: pool exhausted after 30000ms (max=5, in_use=5)"
+    },
+    {
+      "timestamp": "2026-10-24T14:12:00Z",
+      "level": "ERROR",
+      "service": "payment-service",
+      "message": "HTTP 504 dispatched to gateway for trace_id=tx_9921",
+      "exception": "GatewayTimeout"
+    }
+  ],
+  "metrics": {
+    "payment-service": {
+      "error_rate_5xx": [
+        {
+          "timestamp": "2026-10-24T13:40:00Z",
+          "value": 0.005
+        },
+        {
+          "timestamp": "2026-10-24T13:50:00Z",
+          "value": 0.008
+        },
+        {
+          "timestamp": "2026-10-24T14:05:00Z",
+          "value": 0.35
+        },
+        {
+          "timestamp": "2026-10-24T14:15:00Z",
+          "value": 0.48
+        }
+      ],
+      "latency_p99": [
+        {
+          "timestamp": "2026-10-24T13:40:00Z",
+          "value": 110.0
+        },
+        {
+          "timestamp": "2026-10-24T13:50:00Z",
+          "value": 125.0
+        },
+        {
+          "timestamp": "2026-10-24T14:05:00Z",
+          "value": 4800.0
+        },
+        {
+          "timestamp": "2026-10-24T14:15:00Z",
+          "value": 6200.0
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "payment-service": [
+      {
+        "timestamp": "2026-10-24T13:50:00Z",
+        "version_tag": "v2.8.4",
+        "author": "sre_alex@orange.com",
+        "commit_message": "Tune pool size for cost reduction",
+        "config_diff": {
+          "max_connections": 5,
+          "previous_max_connections": 100
+        },
+        "is_suspect": true
+      }
+    ]
+  },
+  "topology": {
+    "payment-service": {
+      "service_type": "api_service",
+      "health_status": "DEGRADED",
+      "upstream": [
+        "api-gateway",
+        "checkout-service"
+      ],
+      "downstream": [
+        "postgres-payment-db",
+        "stripe-api"
+      ],
+      "config_summary": {
+        "max_db_connections": 5,
+        "min_replicas": 4
+      }
+    }
+  },
+  "historical_incidents": [
+    {
+      "incident_id": "INC-PREV-201",
+      "service": "payment-service",
+      "title": "Payment gateway connection starvation",
+      "date": "2025-06-11",
+      "root_cause": "Database connection pool size was set below peak concurrency requirement.",
+      "mitigation": "Increase max_connections to at least 80 and set connection acquisition timeout."
+    }
+  ],
+  "chaos_rules": {}
+}

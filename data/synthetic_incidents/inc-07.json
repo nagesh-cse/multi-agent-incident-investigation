@@ -1,0 +1,88 @@
+{
+  "incident_id": "INC-07",
+  "title": "User Profile Service Error Spike with Log Cluster Failure",
+  "description": "User profile service errors spiked to 50%. The centralized Elasticsearch logging cluster is experiencing a major outage.",
+  "affected_service": "user-profile-service",
+  "timestamp": "2026-10-24T21:00:00Z",
+  "severity": "HIGH",
+  "initial_symptoms": [
+    "500 Internal Server Error on /profile",
+    "Logs query times out"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "Bad deployment v2.1.0 introduced an invalid database migration; agent must diagnose the issue via metrics and deployment history because the logging tool experiences simulated timeout.",
+    "culprit_service": "user-profile-service",
+    "key_evidence": [
+      "Deployment at 20:45 UTC with commit 'Apply user table migration without index'",
+      "Metrics show error rate spiked to 50% exactly at 20:46 UTC",
+      "Historical incident INC-882 documents identical postmortem"
+    ],
+    "distractors": [
+      "Log service cluster outage raises ToolTimeoutError"
+    ]
+  },
+  "logs": [],
+  "metrics": {
+    "user-profile-service": {
+      "error_rate_5xx": [
+        {
+          "timestamp": "2026-10-24T20:40:00Z",
+          "value": 0.01
+        },
+        {
+          "timestamp": "2026-10-24T20:46:00Z",
+          "value": 0.52
+        },
+        {
+          "timestamp": "2026-10-24T21:00:00Z",
+          "value": 0.51
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "user-profile-service": [
+      {
+        "timestamp": "2026-10-24T20:45:00Z",
+        "version_tag": "v2.1.0",
+        "author": "db_lead@orange.com",
+        "commit_message": "Apply user table migration without index (locked table)",
+        "config_diff": {
+          "migration_script": "20261024_add_bio_column.sql"
+        },
+        "is_suspect": true
+      }
+    ]
+  },
+  "topology": {
+    "user-profile-service": {
+      "service_type": "api_service",
+      "health_status": "DEGRADED",
+      "upstream": [
+        "api-gateway"
+      ],
+      "downstream": [
+        "postgres-user-db"
+      ],
+      "config_summary": {
+        "table_lock_timeout": "5s"
+      }
+    }
+  },
+  "historical_incidents": [
+    {
+      "incident_id": "INC-882",
+      "service": "user-profile-service",
+      "title": "Table lock during schema migration",
+      "date": "2025-09-01",
+      "root_cause": "DDL migration executed during business hours locked user table, causing all writes to fail with 500.",
+      "mitigation": "Kill lingering DDL transaction lock and apply migration concurrently."
+    }
+  ],
+  "chaos_rules": {
+    "query_logs": {
+      "action": "timeout",
+      "message": "Elasticsearch logging cluster unresponsive (timeout after 30000ms)"
+    }
+  }
+}

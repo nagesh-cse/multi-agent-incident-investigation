@@ -1,0 +1,44 @@
+{
+  "incident_id": "INC-10",
+  "title": "Intermittent Micro-Dropouts on Core Network Router",
+  "description": "User reports of intermittent disconnects over the past hour. The monitoring agent crashed and no metrics or logs were recorded.",
+  "affected_service": "edge-router-core",
+  "timestamp": "2026-10-24T23:00:00Z",
+  "severity": "LOW",
+  "initial_symptoms": [
+    "Intermittent 502/504 reported by 3 users",
+    "No logs recorded in system"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "INCONCLUSIVE: Telemetry is completely missing due to telemetry agent crash; system must identify that facts are insufficient and output an Inconclusive verdict without hallucinating.",
+    "culprit_service": "unknown",
+    "key_evidence": [
+      "Logs query returns 0 records",
+      "Metrics query returns empty telemetry data",
+      "No deployments recorded in the lookback window"
+    ],
+    "distractors": [
+      "Unsubstantiated user theories on community forums"
+    ]
+  },
+  "logs": [],
+  "metrics": {
+    "edge-router-core": {}
+  },
+  "deployments": {
+    "edge-router-core": []
+  },
+  "topology": {
+    "edge-router-core": {
+      "service_type": "network_router",
+      "health_status": "UNKNOWN",
+      "upstream": [],
+      "downstream": [],
+      "config_summary": {
+        "telemetry_agent_status": "CRASHED"
+      }
+    }
+  },
+  "historical_incidents": [],
+  "chaos_rules": {}
+}

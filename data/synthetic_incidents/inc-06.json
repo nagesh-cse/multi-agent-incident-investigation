@@ -1,0 +1,92 @@
+{
+  "incident_id": "INC-06",
+  "title": "Inventory Service Crashing on Message Consumption",
+  "description": "Inventory-service dead-letter queue is filling rapidly with unparseable messages from Kafka topic 'catalog-events'.",
+  "affected_service": "inventory-service",
+  "timestamp": "2026-10-24T20:10:00Z",
+  "severity": "HIGH",
+  "initial_symptoms": [
+    "Crash on message deserialize",
+    "KeyError: 'warehouse_id'"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "Breaking schema change in upstream catalog-service (v4.0.0) which renamed JSON key 'warehouse_id' to 'facility_id' without backward compatibility.",
+    "culprit_service": "catalog-service",
+    "key_evidence": [
+      "catalog-service deployed v4.0.0 at 19:55 UTC with commit 'Refactor warehouse terminology to facility'",
+      "inventory-service logs show KeyError: 'warehouse_id'",
+      "Topology shows catalog-service produces to Kafka topic consumed by inventory-service"
+    ],
+    "distractors": [
+      "Kafka broker reported a rebalance event at 19:58 UTC (normal rebalance)"
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2026-10-24T19:58:00Z",
+      "level": "INFO",
+      "service": "kafka-cluster",
+      "message": "Consumer group 'inventory-group' rebalanced"
+    },
+    {
+      "timestamp": "2026-10-24T20:01:10Z",
+      "level": "ERROR",
+      "service": "inventory-service",
+      "message": "Failed to parse CatalogItemUpdated payload",
+      "exception": "KeyError: 'warehouse_id' in record {'item_id': 991, 'facility_id': 'WH-EAST'}"
+    },
+    {
+      "timestamp": "2026-10-24T20:05:00Z",
+      "level": "ERROR",
+      "service": "inventory-service",
+      "message": "Routing message to dead-letter queue: DLQ-inventory-errors"
+    }
+  ],
+  "metrics": {
+    "inventory-service": {
+      "error_rate_5xx": [
+        {
+          "timestamp": "2026-10-24T19:50:00Z",
+          "value": 0.0
+        },
+        {
+          "timestamp": "2026-10-24T20:05:00Z",
+          "value": 0.95
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "catalog-service": [
+      {
+        "timestamp": "2026-10-24T19:55:00Z",
+        "version_tag": "v4.0.0",
+        "author": "catalog_dev@orange.com",
+        "commit_message": "Refactor warehouse terminology to facility",
+        "config_diff": {
+          "schema_version": 2,
+          "rename_field": "warehouse_id -> facility_id"
+        },
+        "is_suspect": true
+      }
+    ],
+    "inventory-service": []
+  },
+  "topology": {
+    "inventory-service": {
+      "service_type": "event_consumer",
+      "health_status": "UNHEALTHY",
+      "upstream": [
+        "catalog-service (via Kafka)"
+      ],
+      "downstream": [
+        "inventory-db"
+      ],
+      "config_summary": {
+        "expected_schema": "v1"
+      }
+    }
+  },
+  "historical_incidents": [],
+  "chaos_rules": {}
+}

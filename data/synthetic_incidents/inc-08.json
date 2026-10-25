@@ -1,0 +1,103 @@
+{
+  "incident_id": "INC-08",
+  "title": "Mutual Freeze Between Billing and Notification Services",
+  "description": "Billing-service and notification-service have stopped processing requests. CPU and memory are completely flat, but all requests hang indefinitely.",
+  "affected_service": "billing-service",
+  "timestamp": "2026-10-24T21:30:00Z",
+  "severity": "CRITICAL",
+  "initial_symptoms": [
+    "Zero throughput",
+    "Hanging requests",
+    "Zero CPU/memory usage"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "Distributed circular lock deadlock: billing-service holds Lock A (invoice) and synchronously waits for notification-service, while notification-service holds Lock B (customer) and synchronously waits for billing-service.",
+    "culprit_service": "billing-service",
+    "key_evidence": [
+      "Topology shows circular synchronous HTTP dependency between billing-service and notification-service",
+      "Logs show billing waiting for notification ACK while notification waits for billing customer verification",
+      "Deployments show recent change converted notification dispatch from asynchronous queue to synchronous HTTP call"
+    ],
+    "distractors": [
+      "Metrics show 0% errors (requests don't fail, they just hang forever)"
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2026-10-24T21:10:00Z",
+      "level": "INFO",
+      "service": "billing-service",
+      "message": "Acquired InvoiceLock:inv_402; calling notification-service /send synchronously"
+    },
+    {
+      "timestamp": "2026-10-24T21:10:01Z",
+      "level": "INFO",
+      "service": "notification-service",
+      "message": "Acquired CustomerLock:cust_99; calling billing-service /verify synchronously"
+    },
+    {
+      "timestamp": "2026-10-24T21:15:00Z",
+      "level": "WARN",
+      "service": "billing-service",
+      "message": "Thread pool saturation: 100% of threads in BLOCKED state waiting for downstream lock release"
+    }
+  ],
+  "metrics": {
+    "billing-service": {
+      "latency_p99": [
+        {
+          "timestamp": "2026-10-24T21:00:00Z",
+          "value": 150.0
+        },
+        {
+          "timestamp": "2026-10-24T21:20:00Z",
+          "value": 60000.0
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "billing-service": [
+      {
+        "timestamp": "2026-10-24T20:30:00Z",
+        "version_tag": "v3.0.1",
+        "author": "sync_dev@orange.com",
+        "commit_message": "Switch notification dispatch from RabbitMQ to direct synchronous HTTP client",
+        "config_diff": {
+          "async_notifications": false
+        },
+        "is_suspect": true
+      }
+    ]
+  },
+  "topology": {
+    "billing-service": {
+      "service_type": "api_service",
+      "health_status": "DEGRADED",
+      "upstream": [
+        "checkout-service"
+      ],
+      "downstream": [
+        "notification-service"
+      ],
+      "config_summary": {
+        "sync_timeout_ms": 60000
+      }
+    },
+    "notification-service": {
+      "service_type": "api_service",
+      "health_status": "DEGRADED",
+      "upstream": [
+        "billing-service"
+      ],
+      "downstream": [
+        "billing-service"
+      ],
+      "config_summary": {
+        "sync_timeout_ms": 60000
+      }
+    }
+  },
+  "historical_incidents": [],
+  "chaos_rules": {}
+}

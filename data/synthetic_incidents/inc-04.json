@@ -1,0 +1,103 @@
+{
+  "incident_id": "INC-04",
+  "title": "Persistent Database Overload After Brief Network Glitch",
+  "description": "A 5-second network partition occurred and recovered 30 minutes ago, but order-service and database remain completely overwhelmed with 100k queries/sec.",
+  "affected_service": "order-service",
+  "timestamp": "2026-10-24T18:00:00Z",
+  "severity": "CRITICAL",
+  "initial_symptoms": [
+    "100k queries/sec hitting db",
+    "Massive request queues"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "Clients and upstream services lack exponential backoff and jitter, creating a self-inflicted retry storm that keeps the database saturated after a transient blip.",
+    "culprit_service": "order-service",
+    "key_evidence": [
+      "Logs show repetitive immediate retries with retry_count=15 without backoff delay",
+      "Network metrics show the underlying network glitch lasted only from 17:29 to 17:30 UTC",
+      "Topology config shows client_retry_policy: 'IMMEDIATE_NO_BACKOFF'"
+    ],
+    "distractors": [
+      "Suspicion of external DDoS attack due to high traffic volume"
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2026-10-24T17:29:50Z",
+      "level": "WARN",
+      "service": "order-service",
+      "message": "Transient network connection reset by peer"
+    },
+    {
+      "timestamp": "2026-10-24T17:30:10Z",
+      "level": "INFO",
+      "service": "network",
+      "message": "Switch port flap resolved, network latency normalized to 0.4ms"
+    },
+    {
+      "timestamp": "2026-10-24T17:35:00Z",
+      "level": "ERROR",
+      "service": "order-service",
+      "message": "Client retrying immediately (retry_count=18, backoff_ms=0)"
+    },
+    {
+      "timestamp": "2026-10-24T17:45:00Z",
+      "level": "ERROR",
+      "service": "order-service",
+      "message": "Database thread queue full: 100000 queued requests"
+    }
+  ],
+  "metrics": {
+    "order-service": {
+      "error_rate_5xx": [
+        {
+          "timestamp": "2026-10-24T17:25:00Z",
+          "value": 0.001
+        },
+        {
+          "timestamp": "2026-10-24T17:30:00Z",
+          "value": 0.85
+        },
+        {
+          "timestamp": "2026-10-24T18:00:00Z",
+          "value": 0.72
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "order-service": [
+      {
+        "timestamp": "2026-10-24T12:00:00Z",
+        "version_tag": "v1.4.0",
+        "author": "lead_eng@orange.com",
+        "commit_message": "Aggressive retry policy for mobile clients",
+        "config_diff": {
+          "retry_policy": "IMMEDIATE",
+          "max_retries": 25,
+          "backoff": "none"
+        },
+        "is_suspect": true
+      }
+    ]
+  },
+  "topology": {
+    "order-service": {
+      "service_type": "api_service",
+      "health_status": "DEGRADED",
+      "upstream": [
+        "mobile-app",
+        "web-gateway"
+      ],
+      "downstream": [
+        "postgres-order-db"
+      ],
+      "config_summary": {
+        "retry_jitter": false,
+        "backoff_multiplier": 1.0
+      }
+    }
+  },
+  "historical_incidents": [],
+  "chaos_rules": {}
+}

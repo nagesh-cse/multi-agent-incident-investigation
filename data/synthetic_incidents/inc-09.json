@@ -1,0 +1,81 @@
+{
+  "incident_id": "INC-09",
+  "title": "Global Ingress SSL Handshake Failures",
+  "description": "All mobile clients and browsers reporting SSL certificate expired on api.orange.com. All backend containers are completely healthy.",
+  "affected_service": "api-gateway",
+  "timestamp": "2026-10-24T22:00:00Z",
+  "severity": "CRITICAL",
+  "initial_symptoms": [
+    "SSLHandshakeException",
+    "Certificate expired error in clients"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "TLS certificate expired on ingress gateway because automated cert-manager renewal cron job failed 48 hours ago due to DNS-01 challenge credentials failure.",
+    "culprit_service": "api-gateway",
+    "key_evidence": [
+      "Gateway logs show SSL_ERROR_CERT_EXPIRED with validity ending 2026-10-24T21:59:00Z",
+      "Topology shows api-gateway ingress TLS cert expiration timestamp in the past",
+      "Zero recent code deployments to backend services"
+    ],
+    "distractors": [
+      "Backend services show 100% health checks passing (because internal traffic bypasses public TLS)"
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2026-10-24T21:58:00Z",
+      "level": "INFO",
+      "service": "api-gateway",
+      "message": "Inbound HTTPS connection established"
+    },
+    {
+      "timestamp": "2026-10-24T22:00:01Z",
+      "level": "ERROR",
+      "service": "api-gateway",
+      "message": "SSL Handshake Failed: Certificate expired at 2026-10-24T21:59:59Z",
+      "exception": "SSLCertVerificationError: certificate has expired"
+    },
+    {
+      "timestamp": "2026-10-24T22:05:00Z",
+      "level": "ERROR",
+      "service": "cert-manager",
+      "message": "Automated renewal failed: Cloudflare API token invalid for DNS-01 challenge"
+    }
+  ],
+  "metrics": {
+    "api-gateway": {
+      "error_rate_5xx": [
+        {
+          "timestamp": "2026-10-24T21:50:00Z",
+          "value": 0.0
+        },
+        {
+          "timestamp": "2026-10-24T22:05:00Z",
+          "value": 0.99
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "api-gateway": []
+  },
+  "topology": {
+    "api-gateway": {
+      "service_type": "ingress_gateway",
+      "health_status": "UNHEALTHY",
+      "upstream": [
+        "public_internet"
+      ],
+      "downstream": [
+        "auth-service",
+        "checkout-service",
+        "payment-service"
+      ],
+      "config_summary": {
+        "tls_cert_expires": "2026-10-24T21:59:59Z"
+      }
+    }
+  },
+  "historical_incidents": [],
+  "chaos_rules": {}
+}

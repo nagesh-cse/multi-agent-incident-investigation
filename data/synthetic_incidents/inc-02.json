@@ -1,0 +1,128 @@
+{
+  "incident_id": "INC-02",
+  "title": "Auth Service Worker Pods Crashing (OOMKilled)",
+  "description": "Auth-service pods are crashing cyclically with exit code 137 (OOMKilled). User sign-ins failing intermittently.",
+  "affected_service": "auth-service",
+  "timestamp": "2026-10-24T16:00:00Z",
+  "severity": "CRITICAL",
+  "initial_symptoms": [
+    "Pod restarts",
+    "Exit code 137",
+    "Intermittent 502 Bad Gateway"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "Unbounded session cache memory leak introduced in deploy v3.1.0 (deployed 6 hours ago), causing RSS memory to steadily climb until hitting the 2GB container limit.",
+    "culprit_service": "auth-service",
+    "key_evidence": [
+      "Memory metric shows steady linear upward trend from 25% at 10:00 UTC to 98% at 15:50 UTC",
+      "Deploy v3.1.0 deployed at 10:00 UTC with commit 'Add in-memory user session cache'",
+      "Logs show OutOfMemory / cgroup killer invocation"
+    ],
+    "distractors": [
+      "Minor frontend static asset deploy at 15:52 UTC (v1.0.9 by web_team) right before pod crash"
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2026-10-24T10:05:00Z",
+      "level": "INFO",
+      "service": "auth-service",
+      "message": "v3.1.0 initialized session cache with TTL=0 (unbounded)"
+    },
+    {
+      "timestamp": "2026-10-24T15:52:00Z",
+      "level": "INFO",
+      "service": "web-frontend",
+      "message": "Deployed frontend v1.0.9: updated button color"
+    },
+    {
+      "timestamp": "2026-10-24T15:55:10Z",
+      "level": "WARN",
+      "service": "auth-service",
+      "message": "Memory utilization exceeded 92% (1840MB/2000MB)"
+    },
+    {
+      "timestamp": "2026-10-24T15:58:44Z",
+      "level": "FATAL",
+      "service": "auth-service",
+      "message": "Container killed by kernel: OOMKilled cgroups limit reached",
+      "exception": "KernelOOMExitCode137"
+    }
+  ],
+  "metrics": {
+    "auth-service": {
+      "memory": [
+        {
+          "timestamp": "2026-10-24T10:00:00Z",
+          "value": 24.5
+        },
+        {
+          "timestamp": "2026-10-24T12:00:00Z",
+          "value": 52.0
+        },
+        {
+          "timestamp": "2026-10-24T14:00:00Z",
+          "value": 78.4
+        },
+        {
+          "timestamp": "2026-10-24T15:50:00Z",
+          "value": 98.2
+        }
+      ],
+      "cpu": [
+        {
+          "timestamp": "2026-10-24T10:00:00Z",
+          "value": 15.0
+        },
+        {
+          "timestamp": "2026-10-24T15:50:00Z",
+          "value": 18.0
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "auth-service": [
+      {
+        "timestamp": "2026-10-24T10:00:00Z",
+        "version_tag": "v3.1.0",
+        "author": "backend_dave@orange.com",
+        "commit_message": "Add in-memory user session cache without eviction policy",
+        "config_diff": {
+          "cache_enabled": true,
+          "cache_max_size": "unlimited"
+        },
+        "is_suspect": true
+      }
+    ],
+    "web-frontend": [
+      {
+        "timestamp": "2026-10-24T15:52:00Z",
+        "version_tag": "v1.0.9",
+        "author": "ui_sarah@orange.com",
+        "commit_message": "Change checkout button color to blue",
+        "config_diff": {},
+        "is_suspect": false
+      }
+    ]
+  },
+  "topology": {
+    "auth-service": {
+      "service_type": "api_service",
+      "health_status": "UNHEALTHY",
+      "upstream": [
+        "api-gateway"
+      ],
+      "downstream": [
+        "redis-sessions",
+        "postgres-user-db"
+      ],
+      "config_summary": {
+        "container_mem_limit": "2048Mi",
+        "restart_policy": "Always"
+      }
+    }
+  },
+  "historical_incidents": [],
+  "chaos_rules": {}
+}

@@ -1,0 +1,107 @@
+{
+  "incident_id": "INC-03",
+  "title": "Checkout Service High P99 Latency & Connection Pileup",
+  "description": "Checkout service latency spiked to 35 seconds. Thread pools are exhausted and CPU is at 95% due to thread contention.",
+  "affected_service": "checkout-service",
+  "timestamp": "2026-10-24T17:30:00Z",
+  "severity": "HIGH",
+  "initial_symptoms": [
+    "P99 latency > 30s",
+    "Thread starvation in checkout-service"
+  ],
+  "ground_truth": {
+    "root_cause_summary": "Downstream external payment provider (Stripe API) experiencing major service outage; lack of timeout and circuit breaker in checkout-service caused thread exhaustion.",
+    "culprit_service": "external-stripe-api",
+    "key_evidence": [
+      "Service topology shows checkout-service depends on external 'stripe-api'",
+      "Topology downstream health shows stripe-api status as 'UNHEALTHY'",
+      "Logs show read timeouts when contacting https://api.stripe.com/v1/charges",
+      "No deployments to checkout-service in past 72 hours"
+    ],
+    "distractors": [
+      "CPU usage on checkout-service is 95% (symptom of thread contention, not the cause)"
+    ]
+  },
+  "logs": [
+    {
+      "timestamp": "2026-10-24T17:15:20Z",
+      "level": "WARN",
+      "service": "checkout-service",
+      "message": "Slow response from payment provider: 28400ms for charge_req_81"
+    },
+    {
+      "timestamp": "2026-10-24T17:20:00Z",
+      "level": "ERROR",
+      "service": "checkout-service",
+      "message": "Read timed out connecting to https://api.stripe.com/v1/charges",
+      "exception": "SocketTimeoutException: Read timed out after 30000ms"
+    },
+    {
+      "timestamp": "2026-10-24T17:25:00Z",
+      "level": "ERROR",
+      "service": "checkout-service",
+      "message": "Worker thread pool reached 100% capacity (500/500 threads blocked)"
+    }
+  ],
+  "metrics": {
+    "checkout-service": {
+      "latency_p99": [
+        {
+          "timestamp": "2026-10-24T17:00:00Z",
+          "value": 180.0
+        },
+        {
+          "timestamp": "2026-10-24T17:20:00Z",
+          "value": 31000.0
+        },
+        {
+          "timestamp": "2026-10-24T17:30:00Z",
+          "value": 35000.0
+        }
+      ],
+      "cpu": [
+        {
+          "timestamp": "2026-10-24T17:00:00Z",
+          "value": 20.0
+        },
+        {
+          "timestamp": "2026-10-24T17:25:00Z",
+          "value": 95.0
+        }
+      ]
+    }
+  },
+  "deployments": {
+    "checkout-service": []
+  },
+  "topology": {
+    "checkout-service": {
+      "service_type": "api_service",
+      "health_status": "DEGRADED",
+      "upstream": [
+        "api-gateway"
+      ],
+      "downstream": [
+        "inventory-service",
+        "stripe-api"
+      ],
+      "config_summary": {
+        "http_timeout_ms": 30000,
+        "circuit_breaker_enabled": false
+      }
+    },
+    "stripe-api": {
+      "service_type": "external_api",
+      "health_status": "UNHEALTHY",
+      "upstream": [
+        "checkout-service"
+      ],
+      "downstream": [],
+      "config_summary": {
+        "provider": "Stripe US-East"
+      }
+    }
+  },
+  "historical_incidents": [],
+  "chaos_rules": {}
+}
