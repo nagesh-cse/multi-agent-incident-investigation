@@ -9,7 +9,7 @@ from src.state.models import (
     CriticVerdictStatus,
     EvidenceItem,
 )
-from src.llm.client import llm_config
+from src.llm import llm_config, estimate_tokens
 
 
 def reporting_node(state: InvestigationState) -> Dict[str, Any]:
@@ -35,10 +35,11 @@ def reporting_node(state: InvestigationState) -> Dict[str, Any]:
 
     # Handle INCONCLUSIVE outcome (Requirement 2.D)
     if critic and critic.status == CriticVerdictStatus.INCONCLUSIVE:
+        inconc_summary = "Investigation concluded INCONCLUSIVE due to complete absence of telemetry and log data. In accordance with system safety policies, no root cause is asserted without factual evidence."
         report = IncidentReport(
             incident_id=ticket.incident_id,
             title=ticket.title,
-            executive_summary="Investigation concluded INCONCLUSIVE due to complete absence of telemetry and log data. In accordance with system safety policies, no root cause is asserted without factual evidence.",
+            executive_summary=inconc_summary,
             conclusion_status="INCONCLUSIVE",
             probable_root_cause=None,
             confidence_level=0.0,
@@ -61,10 +62,10 @@ def reporting_node(state: InvestigationState) -> Dict[str, Any]:
             ],
             investigation_iterations=current_iter,
             total_tool_calls=total_calls,
-            total_tokens_used=state.get("total_tokens_used", 0) + 500,
+            total_tokens_used=state.get("total_tokens_used", 0),
             wall_clock_seconds=round(time.time() - start_time, 2) if start_time > 0 else 0.0,
         )
-        return {"final_report": report, "total_tokens_used": 500}
+        return {"final_report": report, "total_tokens_used": 0}
 
     # Top hypothesis
     top_hypothesis = hypotheses[0] if hypotheses else None
@@ -185,11 +186,11 @@ def reporting_node(state: InvestigationState) -> Dict[str, Any]:
         recommended_actions=actions,
         investigation_iterations=current_iter,
         total_tool_calls=total_calls,
-        total_tokens_used=state.get("total_tokens_used", 0) + 500,
+        total_tokens_used=state.get("total_tokens_used", 0),
         wall_clock_seconds=round(time.time() - start_time, 2) if start_time > 0 else 0.0,
     )
 
     return {
         "final_report": report,
-        "total_tokens_used": 500
+        "total_tokens_used": 0
     }

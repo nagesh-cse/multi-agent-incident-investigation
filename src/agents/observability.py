@@ -7,6 +7,7 @@ from src.tools import (
     query_logs,
     query_metrics,
 )
+from src.llm import estimate_tokens
 
 
 def observability_node(state: InvestigationState, context: ToolExecutionContext) -> Dict[str, Any]:
@@ -100,5 +101,5 @@ def observability_node(state: InvestigationState, context: ToolExecutionContext)
         "completed_tasks": completed,
         "tool_failure_events": failures,
         "total_tool_calls": tool_calls_count,
-        "total_tokens_used": 400,
+        "total_tokens_used": 0,
     }

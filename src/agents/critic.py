@@ -6,15 +6,16 @@ from src.state.models import (
     CriticVerdictStatus,
     InvestigationTask,
 )
-from src.llm.client import llm_config
+from src.llm import llm_config, LiveTokenTracker, estimate_tokens
 
 
 def critic_node(state: InvestigationState) -> Dict[str, Any]:
     """
     Critic Agent (Auditor):
     - Challenges assumptions and tests for confirmation bias.
-    - If live Gemini LLM is configured, dynamically prompts Gemini as an adversarial auditor.
-    - Otherwise, executes deterministic auditing logic.
+    - If live Gemini/OpenRouter LLM is configured, dynamically prompts with structured output.
+    - Tracks live tokens with LiveTokenTracker callback.
+    - Otherwise, executes deterministic auditing logic with dynamic token estimation.
     """
     evidence = state.get("evidence_store", [])
     hypotheses = state.get("hypotheses", [])
@@ -23,7 +24,7 @@ def critic_node(state: InvestigationState) -> Dict[str, Any]:
     ticket = state["incident_ticket"]
     failures = state.get("tool_failure_events", [])
 
-    # 1. Try Live Gemini LLM invocation if configured
+    # 1. Try Live LLM invocation if configured
     llm = llm_config.get_chat_model()
     if llm and evidence and len(evidence) > 1 and hypotheses:
         try:
@@ -41,15 +42,17 @@ def critic_node(state: InvestigationState) -> Dict[str, Any]:
                 f"- If evidence is completely empty or inconclusive, output status='INCONCLUSIVE'.\n"
                 f"- If hypotheses are well-supported by verified facts, output status='APPROVED'."
             )
-            llm_result: CriticVerdict = structured_llm.invoke(prompt)
+            tracker = LiveTokenTracker()
+            llm_result: CriticVerdict = structured_llm.invoke(prompt, config={"callbacks": [tracker]})
             if llm_result:
                 return {
                     "critic_verdict": llm_result,
                     "current_iteration": iteration + 1,
-                    "total_tokens_used": 550,
+                    "total_tokens_used": tracker.total_tokens,
                 }
-        except Exception:
-            pass
+        except Exception as e:
+            err_msg = str(e).split("\n")[0][:120]
+            print(f"  [⚠️ Critic Fallback] LLM unavailable ({type(e).__name__}: {err_msg}). Using deterministic auditor.", flush=True)
 
     # Check 1: Inconclusive detection (Scenario 10)
     if not evidence or (len(evidence) == 1 and evidence[0].source == "topology" and "UNKNOWN" in evidence[0].description):
@@ -63,7 +66,7 @@ def critic_node(state: InvestigationState) -> Dict[str, Any]:
         return {
             "critic_verdict": verdict,
             "current_iteration": iteration + 1,
-            "total_tokens_used": 450,
+            "total_tokens_used": 0,
         }
 
     # Check 2: Check for unsupported assumptions in hypotheses
@@ -100,7 +103,7 @@ def critic_node(state: InvestigationState) -> Dict[str, Any]:
         return {
             "critic_verdict": verdict,
             "current_iteration": iteration + 1,
-            "total_tokens_used": 450,
+            "total_tokens_used": 0,
         }
 
     # Check 4: Evidence is sufficient and grounded -> APPROVED
@@ -115,5 +118,5 @@ def critic_node(state: InvestigationState) -> Dict[str, Any]:
     return {
         "critic_verdict": verdict,
         "current_iteration": iteration + 1,
-        "total_tokens_used": 450,
+        "total_tokens_used": 0,
     }

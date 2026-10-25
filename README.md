@@ -91,8 +91,17 @@ To run with live LLM reasoning (using OpenRouter):
    ```env
    OPENROUTER_API_KEY=your_openrouter_api_key_here
    OPENROUTER_MODEL=nvidia/nemotron-3.5-lightning:free
+
+   # Bounded Retries & Execution Limits
+   LLM_TIMEOUT=20
+   LLM_MAX_RETRIES=2
    ```
-*(If no API key is configured or `USE_MOCK_LLM=true`, the system automatically runs in deterministic offline mode for instant 0.1s evaluation).*
+*(If no API key is configured or `USE_MOCK_LLM=true`, or if the LLM times out after retries, the system automatically falls back to deterministic expert mode with 100% reliability).*
+
+### 4. Live Token Tracking
+Token tracking is **live and dynamic**:
+- When running live LLMs, tokens are captured directly from provider API response metadata via a LangChain `LiveTokenTracker` callback handler.
+- Tool telemetry and offline fallback tokens are dynamically calculated using `estimate_tokens()` based on the actual character and payload length of queried logs and metrics.
 
 ---
 

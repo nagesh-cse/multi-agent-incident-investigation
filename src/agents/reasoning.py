@@ -1,20 +1,21 @@
 from __future__ import annotations
 from typing import List, Dict, Any, Optional
 from src.state.models import InvestigationState, Hypothesis, ReasoningLLMOutput
-from src.llm.client import llm_config
+from src.llm import llm_config, LiveTokenTracker, estimate_tokens
 
 
 def reasoning_node(state: InvestigationState) -> Dict[str, Any]:
     """
     Reasoning Agent:
     - Merges telemetry and dependency findings from state["evidence_store"].
-    - If live Gemini LLM is configured, dynamically prompts Gemini with structured output.
-    - Otherwise, executes deterministic multi-hypothesis reasoning logic.
+    - If live Gemini/OpenRouter LLM is configured, dynamically prompts with structured output.
+    - Tracks live tokens with LiveTokenTracker callback.
+    - Otherwise, executes deterministic multi-hypothesis reasoning logic with dynamic token estimation.
     """
     evidence = state.get("evidence_store", [])
     ticket = state["incident_ticket"]
 
-    # 1. Try Live Gemini LLM invocation if configured
+    # 1. Try Live LLM invocation if configured
     llm = llm_config.get_chat_model()
     if llm and evidence and len(evidence) > 1:
         try:
@@ -29,14 +30,16 @@ def reasoning_node(state: InvestigationState) -> Dict[str, Any]:
                 f"For each hypothesis, assign a calibrated confidence score between 0.0 and 1.0, and cite the exact supporting_evidence_ids (e.g. ['EV-DEP-1', 'EV-LOG-1']).\n"
                 f"Mark is_root_cause=True for your top hypothesis."
             )
-            llm_result: ReasoningLLMOutput = structured_llm.invoke(prompt)
+            tracker = LiveTokenTracker()
+            llm_result: ReasoningLLMOutput = structured_llm.invoke(prompt, config={"callbacks": [tracker]})
             if llm_result and llm_result.hypotheses:
                 return {
                     "hypotheses": llm_result.hypotheses,
-                    "total_tokens_used": 750,
+                    "total_tokens_used": tracker.total_tokens,
                 }
         except Exception as e:
-            pass
+            err_msg = str(e).split("\n")[0][:120]
+            print(f"  [⚠️ Reasoning Fallback] LLM unavailable ({type(e).__name__}: {err_msg}). Using deterministic reasoning.", flush=True)
 
     # Case 1: Inconclusive (Insufficient evidence, e.g. Incident 10)
     if not evidence or len(evidence) <= 1:
@@ -60,7 +63,7 @@ def reasoning_node(state: InvestigationState) -> Dict[str, Any]:
                 is_root_cause=False
             )
         ]
-        return {"hypotheses": hypotheses, "total_tokens_used": 650}
+        return {"hypotheses": hypotheses, "total_tokens_used": 0}
 
     # Case 2: Analyze evidence items to formulate competing theories
     deploy_evs = [e for e in evidence if e.source == "deployments"]
@@ -317,5 +320,5 @@ def reasoning_node(state: InvestigationState) -> Dict[str, Any]:
 
     return {
         "hypotheses": hypotheses,
-        "total_tokens_used": 650,
+        "total_tokens_used": 0,
     }

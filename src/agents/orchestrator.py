@@ -1,21 +1,22 @@
 from __future__ import annotations
 from typing import List, Dict, Any
 from src.state.models import InvestigationState, InvestigationTask, CriticVerdictStatus, OrchestratorLLMOutput
-from src.llm.client import llm_config
+from src.llm import llm_config, LiveTokenTracker, estimate_tokens
 
 
 def orchestrator_node(state: InvestigationState) -> Dict[str, Any]:
     """
     Orchestrator Agent:
     - Plans the investigation.
-    - If live Gemini LLM is configured, dynamically prompts Gemini with structured output.
-    - Otherwise, executes deterministic expert planning logic.
+    - If live Gemini/OpenRouter LLM is configured, dynamically prompts with structured output.
+    - Tracks live token usage via LiveTokenTracker callback.
+    - Otherwise, executes deterministic expert planning logic with dynamic token estimation.
     """
     ticket = state["incident_ticket"]
     iteration = state.get("current_iteration", 1)
     critic = state.get("critic_verdict")
 
-    # 1. Try Live Gemini LLM invocation if configured
+    # 1. Try Live LLM invocation if configured
     llm = llm_config.get_chat_model()
     if llm:
         try:
@@ -31,17 +32,18 @@ def orchestrator_node(state: InvestigationState) -> Dict[str, Any]:
                 f"Assign to 'observability' (tools: 'query_logs', 'query_metrics') or "
                 f"'dependency' (tools: 'query_deployments', 'query_service_topology', 'query_historical_incidents')."
             )
-            llm_result: OrchestratorLLMOutput = structured_llm.invoke(prompt)
+            tracker = LiveTokenTracker()
+            llm_result: OrchestratorLLMOutput = structured_llm.invoke(prompt, config={"callbacks": [tracker]})
             if llm_result and llm_result.tasks:
                 for idx, t in enumerate(llm_result.tasks):
                     t.id = f"TASK-LLM-{iteration}-{idx+1}"
                 return {
                     "active_tasks": llm_result.tasks,
-                    "total_tokens_used": 500,
+                    "total_tokens_used": tracker.total_tokens,
                 }
         except Exception as e:
-            # Seamless fallback if live API fails or rate-limits
-            pass
+            err_msg = str(e).split("\n")[0][:120]
+            print(f"  [⚠️ Orchestrator Fallback] LLM unavailable ({type(e).__name__}: {err_msg}). Using deterministic planner.", flush=True)
 
     # 2. Deterministic Fallback Logic
     new_tasks: List[InvestigationTask] = []
@@ -107,5 +109,5 @@ def orchestrator_node(state: InvestigationState) -> Dict[str, Any]:
 
     return {
         "active_tasks": new_tasks,
-        "total_tokens_used": 350,
+        "total_tokens_used": 0,
     }

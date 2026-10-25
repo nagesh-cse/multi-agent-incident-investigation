@@ -20,6 +20,10 @@ class LLMConfig:
         self.gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
+        # Timeout and Retry configuration
+        self.timeout = int(os.getenv("LLM_TIMEOUT", "20"))
+        self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "2"))
+
         # Explicit mock override
         self.force_mock = os.getenv("USE_MOCK_LLM", "false").lower() in ("true", "1", "yes")
 
@@ -42,8 +46,8 @@ class LLMConfig:
                     openai_api_key=self.openrouter_api_key,
                     openai_api_base="https://openrouter.ai/api/v1",
                     temperature=0.1,
-                    timeout=15,
-                    max_retries=1,
+                    timeout=self.timeout,
+                    max_retries=self.max_retries,
                 )
             except Exception as e:
                 print(f"[LLM Warning] OpenRouter init failed: {e}")

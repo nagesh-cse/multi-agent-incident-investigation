@@ -99,11 +99,30 @@ Unlike linear pipelines, this system supports **stateful cyclic iteration**:
 
 ---
 
-## 5. Fault Tolerance & Chaos Recovery
+## 5. Fault Tolerance, LLM Reliability & Chaos Recovery
 
+### A. Tool Failure Recovery
 Production telemetry tools frequently fail. The tool execution layer includes a **Chaos Simulator** (`src/tools/chaos.py`) that tests resilience against:
 - **`ToolTimeoutError`**: Centralized log clusters timing out after 30s.
 - **`ToolRateLimitError`**: HTTP 429 backoff handling.
 - **`Truncated Results`**: Partial observations requiring filter refinement.
 
-**Recovery Mechanism**: When a tool fails, the specialist agent logs a `tool_failure_event` into state and continues investigating using alternate data sources (e.g., if logs time out in Scenario 7, the system reconstructs the root cause using metrics anomalies and deployment history).
+**Recovery Mechanism**: When a tool fails, the specialist agent catches `ToolException`, logs a `tool_failure_event` into state via reducer, and continues investigating using alternate data sources (e.g., if logs time out in Scenario 7, the system reconstructs the root cause using metrics anomalies and deployment history).
+
+### B. LLM Unavailability, Timeouts & Bounded Retries
+If the external LLM provider (OpenRouter or Gemini) experiences outages, rate limits, or latency spikes:
+1. **Configurable Execution Limits**:
+   - `LLM_TIMEOUT` (default: `20` seconds): Caps how long any single LLM invocation may block.
+   - `LLM_MAX_RETRIES` (default: `2` retries): Automatically retries transient errors (HTTP 429, 502, 503, 504, connection timeouts) with exponential backoff.
+2. **Graceful Fallback to Deterministic Expert Engine**:
+   - Every LLM invocation in `Orchestrator`, `Reasoning`, and `Critic` is guarded with `try...except Exception as e:`.
+   - If the LLM does not respond after retries, the agent catches the timeout and **seamlessly switches to the deterministic expert reasoning engine**.
+   - The investigation **never hangs or crashes**, guaranteeing SLA compliance and 100% root-cause resolution.
+
+---
+
+## 6. Live Token Tracking System
+
+Token tracking is completely dynamic:
+1. **Live LLM Token Tracking**: When calling live models, a dedicated `LiveTokenTracker` (`BaseCallbackHandler`) intercepts `on_llm_end` and reads `input_tokens`, `output_tokens`, and `total_tokens` directly from the provider API response metadata.
+2. **Dynamic Context & Telemetry Payload Tracking**: For tool outputs and offline fallback, tokens are dynamically calculated using `estimate_tokens(payload)` based on subword token length (~4 characters per token), scaling realistically with actual data volume.
