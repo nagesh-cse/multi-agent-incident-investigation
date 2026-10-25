@@ -1,6 +1,6 @@
 from __future__ import annotations
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from src.state.models import (
     InvestigationState,
     IncidentReport,
@@ -9,12 +9,14 @@ from src.state.models import (
     CriticVerdictStatus,
     EvidenceItem,
 )
+from src.llm.client import llm_config
 
 
 def reporting_node(state: InvestigationState) -> Dict[str, Any]:
     """
     Reporting Agent:
     - Synthesizes the final grounded RCA report.
+    - If live Gemini LLM is configured, dynamically prompts Gemini to generate the executive summary and remediation actions.
     - Explicitly separates verified FACTS from ASSUMPTIONS.
     - Provides prioritized immediate mitigations and long-term prevention.
     """

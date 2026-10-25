@@ -15,7 +15,7 @@ from langgraph.graph import StateGraph, START, END
 from src.state.models import (
     InvestigationState,
     IncidentTicket,
-    CriticVerdictStatus,
+    CriticVerdictStatus
 )
 from src.tools.base import ToolExecutionContext
 from src.agents.orchestrator import orchestrator_node

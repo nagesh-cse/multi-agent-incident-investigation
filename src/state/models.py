@@ -77,6 +77,14 @@ class CriticVerdict(BaseModel):
     suggested_follow_up_tasks: List[InvestigationTask] = Field(default_factory=list)
 
 
+class OrchestratorLLMOutput(BaseModel):
+    tasks: List[InvestigationTask] = Field(default_factory=list)
+
+
+class ReasoningLLMOutput(BaseModel):
+    hypotheses: List[Hypothesis] = Field(default_factory=list)
+
+
 class RemediationAction(BaseModel):
     type: ActionType
     description: str

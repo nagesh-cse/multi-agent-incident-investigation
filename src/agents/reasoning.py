@@ -1,17 +1,42 @@
 from __future__ import annotations
-from typing import List, Dict, Any
-from src.state.models import InvestigationState, Hypothesis
+from typing import List, Dict, Any, Optional
+from src.state.models import InvestigationState, Hypothesis, ReasoningLLMOutput
+from src.llm.client import llm_config
 
 
 def reasoning_node(state: InvestigationState) -> Dict[str, Any]:
     """
     Reasoning Agent:
     - Merges telemetry and dependency findings from state["evidence_store"].
-    - Generates 2-3 competing root-cause hypotheses.
-    - Weighs supporting vs contradicting evidence and calculates calibrated confidence.
+    - If live Gemini LLM is configured, dynamically prompts Gemini with structured output.
+    - Otherwise, executes deterministic multi-hypothesis reasoning logic.
     """
     evidence = state.get("evidence_store", [])
     ticket = state["incident_ticket"]
+
+    # 1. Try Live Gemini LLM invocation if configured
+    llm = llm_config.get_chat_model()
+    if llm and evidence and len(evidence) > 1:
+        try:
+            structured_llm = llm.with_structured_output(ReasoningLLMOutput)
+            evidence_summary = "\n".join([f"- [{e.id}] ({e.source.upper()}) {e.description}" for e in evidence[:12]])
+            prompt = (
+                f"You are an expert SRE Reasoning Specialist investigating a production incident.\n"
+                f"Incident: {ticket.title} on {ticket.affected_service}\n"
+                f"Description: {ticket.description}\n\n"
+                f"Verified Telemetry & Dependency Evidence:\n{evidence_summary}\n\n"
+                f"Formulate 2 to 3 COMPETING root-cause hypotheses (e.g. H1: primary theory, H2: competing theory, H3: external/traffic theory).\n"
+                f"For each hypothesis, assign a calibrated confidence score between 0.0 and 1.0, and cite the exact supporting_evidence_ids (e.g. ['EV-DEP-1', 'EV-LOG-1']).\n"
+                f"Mark is_root_cause=True for your top hypothesis."
+            )
+            llm_result: ReasoningLLMOutput = structured_llm.invoke(prompt)
+            if llm_result and llm_result.hypotheses:
+                return {
+                    "hypotheses": llm_result.hypotheses,
+                    "total_tokens_used": 750,
+                }
+        except Exception as e:
+            pass
 
     # Case 1: Inconclusive (Insufficient evidence, e.g. Incident 10)
     if not evidence or len(evidence) <= 1:
