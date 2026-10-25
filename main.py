@@ -29,7 +29,7 @@ def handle_list():
     print("\nRun an incident via: python main.py run --incident INC-01\n")
 
 
-def handle_run(incident_id: str):
+def handle_run(incident_id: str, max_iterations: int = 3):
     print(f"\n[+] Loading incident fixture for {incident_id.upper()}...")
     try:
         scenario = load_scenario(incident_id)
@@ -50,9 +50,10 @@ def handle_run(incident_id: str):
         mode_str = f"Live Google Gemini Mode (Model: {llm_config.gemini_model})"
     else:
         mode_str = "Offline Deterministic Mode (No API keys found)"
-    print(f"    LLM Backend     : {mode_str}\n")
+    print(f"    LLM Backend     : {mode_str}")
+    print(f"    Max Iterations  : {max_iterations}\n")
 
-    state = run_investigation(scenario)
+    state = run_investigation(scenario, max_iterations=max_iterations)
     report = state.get("final_report")
 
     if not report:
@@ -116,6 +117,7 @@ def main():
     # Command: run
     run_parser = subparsers.add_parser("run", help="Run multi-agent investigation on a specific incident")
     run_parser.add_argument("--incident", "-i", default="INC-01", help="Incident ID (e.g. INC-01, INC-02)")
+    run_parser.add_argument("--max-iterations", "-m", type=int, default=3, help="Max investigation loops before report synthesis (default: 3)")
 
     # Command: evaluate
     subparsers.add_parser("evaluate", help="Run full evaluation comparing Multi-Agent vs Single-Agent baseline")
@@ -125,7 +127,7 @@ def main():
     if args.command == "list":
         handle_list()
     elif args.command == "run":
-        handle_run(args.incident)
+        handle_run(args.incident, max_iterations=args.max_iterations)
     elif args.command == "evaluate":
         handle_evaluate()
     else:
