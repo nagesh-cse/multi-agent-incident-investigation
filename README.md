@@ -67,8 +67,9 @@ See [docs/architecture.md](docs/architecture.md) for full architectural document
 
 ### 2. Clone and Setup Environment
 ```bash
-# Navigate to project directory
-cd Orange_Assignment
+# Clone the repository
+git clone https://github.com/nagesh-cse/multi-agent-incident-investigation.git
+cd multi-agent-incident-investigation
 
 # Create virtual environment
 python3 -m venv .venv
@@ -78,11 +79,20 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Optional: Configure Gemini API Key
-The system includes a high-fidelity **deterministic evaluation mode** that runs offline with zero setup. To use live Google Gemini (Free tier):
-```bash
-export GEMINI_API_KEY="your-gemini-api-key-here"
-```
+### 3. Optional: Configure LLM API Key (OpenRouter)
+The system includes a high-fidelity **deterministic offline mode** that runs out of the box with zero setup and zero cost.
+
+To run with live LLM reasoning (using OpenRouter):
+1. Copy the environment template:
+   ```bash
+   cp .env.example .env
+   ```
+2. Add your OpenRouter API key and model in `.env`:
+   ```env
+   OPENROUTER_API_KEY=your_openrouter_api_key_here
+   OPENROUTER_MODEL=nvidia/nemotron-3.5-lightning:free
+   ```
+*(If no API key is configured or `USE_MOCK_LLM=true`, the system automatically runs in deterministic offline mode for instant 0.1s evaluation).*
 
 ---
 
@@ -178,7 +188,7 @@ See [evaluation/benchmark_results.md](evaluation/benchmark_results.md) for detai
 ## 📁 Project Structure
 
 ```text
-Orange_Assignment/
+multi-agent-incident-investigation/
 ├── main.py                          # Unified CLI entrypoint (run, evaluate, list)
 ├── requirements.txt                 # Dependencies (langgraph, langchain, pydantic, pytest)
 ├── pytest.ini                       # Test configuration
@@ -208,7 +218,7 @@ Orange_Assignment/
 │   │   └── single_agent.py          # Linear ReAct baseline for comparison
 │   └── llm/
 │       ├── __init__.py
-│       └── client.py                # Google Gemini & offline mode client factory
+│       └── client.py                # OpenRouter, Gemini & offline mode client factory
 ├── data/
 │   └── synthetic_incidents/         # 10 JSON incident fixtures with ground truth & chaos
 ├── evaluation/
