@@ -39,7 +39,18 @@ def handle_run(incident_id: str):
 
     print(f"[*] Starting Multi-Agent Investigation for: {scenario.get('title')}...")
     print(f"    Affected Service: {scenario.get('affected_service')}")
-    print(f"    Initial Ticket: {scenario.get('description')}\n")
+    print(f"    Initial Ticket  : {scenario.get('description')}")
+    
+    from src.llm.client import llm_config
+    if llm_config.force_mock:
+        mode_str = "Offline Deterministic Mode (USE_MOCK_LLM=true)"
+    elif llm_config.openrouter_api_key:
+        mode_str = f"Live OpenRouter Mode (Model: {llm_config.openrouter_model})"
+    elif llm_config.gemini_api_key:
+        mode_str = f"Live Google Gemini Mode (Model: {llm_config.gemini_model})"
+    else:
+        mode_str = "Offline Deterministic Mode (No API keys found)"
+    print(f"    LLM Backend     : {mode_str}\n")
 
     state = run_investigation(scenario)
     report = state.get("final_report")

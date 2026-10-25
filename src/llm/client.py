@@ -42,6 +42,8 @@ class LLMConfig:
                     openai_api_key=self.openrouter_api_key,
                     openai_api_base="https://openrouter.ai/api/v1",
                     temperature=0.1,
+                    timeout=15,
+                    max_retries=1,
                 )
             except Exception as e:
                 print(f"[LLM Warning] OpenRouter init failed: {e}")

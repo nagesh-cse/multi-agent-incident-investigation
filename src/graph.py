@@ -48,16 +48,24 @@ def build_investigation_graph(context: ToolExecutionContext):
     """
     workflow = StateGraph(InvestigationState)
 
-    # 1. Register Agent Nodes
-    workflow.add_node("orchestrator", orchestrator_node)
+    # Helper logger
+    def logged_node(agent_name: str, emoji: str, desc: str, fn):
+        def _wrapper(state):
+            print(f"[{emoji} {agent_name}] {desc} (Iteration {state.get('current_iteration', 1)})...", flush=True)
+            res = fn(state)
+            return res
+        return _wrapper
+
+    # 1. Register Agent Nodes with live progress feedback
+    workflow.add_node("orchestrator", logged_node("Orchestrator Agent", "🤖", "Formulating investigation plan and task assignments", orchestrator_node))
     
     # Tool nodes wrap execution context
-    workflow.add_node("observability", lambda state: observability_node(state, context))
-    workflow.add_node("dependency", lambda state: dependency_node(state, context))
+    workflow.add_node("observability", logged_node("Observability Agent", "🔍", "Querying telemetry logs and metrics", lambda s: observability_node(s, context)))
+    workflow.add_node("dependency", logged_node("Dependency Agent", "🕸️ ", "Inspecting topology, deployments, and incident history", lambda s: dependency_node(s, context)))
     
-    workflow.add_node("reasoning", reasoning_node)
-    workflow.add_node("critic", critic_node)
-    workflow.add_node("reporting", reporting_node)
+    workflow.add_node("reasoning", logged_node("Reasoning Agent", "🧠", "Evaluating telemetry & constructing competing hypotheses", reasoning_node))
+    workflow.add_node("critic", logged_node("Critic Agent", "⚖️ ", "Auditing hypotheses against verified facts and testing confirmation bias", critic_node))
+    workflow.add_node("reporting", logged_node("Reporting Agent", "📝", "Synthesizing final evidence-backed RCA report", reporting_node))
 
     # 2. Wire Graph Topology
     # Start -> Orchestrator
